@@ -1,6 +1,6 @@
 # Does Together's FP8 "Turbo" serving change Llama 3.3 70B's answers?
 
-*Ishaan Singla · Oct 8, 2026 · [repo](https://github.com/<you>/together-parity)*
+*Ishaan Singla · Oct 8, 2026 · [repo](https://github.com/Isingla/together-parity)*
 
 ## Question
 Together AI says its serving stack is much faster while keeping output quality. Its
@@ -28,14 +28,17 @@ Pooled, the 90% CI sits inside ±2 points, so the two paths are **statistically 
 within ±2 pp (TOST), not merely "not significantly different." HumanEval alone is too small
 to claim that: only 4 of 164 problems change correctness (3 favor the reference, 1 Together).
 
-**Answers do move, a little.** On GSM8K the final number differs on 2.1% of problems, against
-a 1.0% noise floor for the reference vs itself and 2.0% for Together vs itself. The flips
-cancel out in accuracy (14 reference-only correct vs 7 Together-only).
+**Answer flips are within serving noise.** On GSM8K the final number differs between the two
+endpoints on 2.1% of problems, while Together disagrees with itself on 2.0% and the reference on
+1.0%. Against the larger of those, the excess is +0.2 points (95% CI [−0.5, +0.8]): not
+distinguishable from nondeterminism. The flips also cancel out in accuracy (14 reference-only
+correct vs 7 Together-only).
 
 **Together isn't deterministic at temperature 0.** Asked the same HumanEval prompt twice,
-Together returned different code 25.0% of the time, vs 3.7% for the reference. Most of the
-30.5% cross-endpoint code difference is Together disagreeing with itself, not FP8 changing
-the model. Likely cause: batch-dependent kernels on a shared server. It's harmless for
+Together returned different code 25.0% of the time, vs 3.7% for the reference. The two endpoints
+differ on 30.5% of code outputs, only +5.5 points above Together's own self-disagreement
+(95% CI [−1.8, +12.8]), so most of that gap is Together disagreeing with itself, not FP8
+changing the model. Likely cause: batch-dependent kernels on a shared server. It's harmless for
 accuracy here, but it matters to anyone who caches, diffs, or tests against model outputs.
 
 ## Result: speed — not 2–3× in this setup
