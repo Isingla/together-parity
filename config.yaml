@@ -1,0 +1,52 @@
+# Quality-parity harness config.
+# Every endpoint is OpenAI-compatible (/v1/chat/completions), so adding a
+# hyperscaler endpoint (Bedrock / Azure / Vertex OpenAI-compatible gateways)
+# is just another block here.
+
+profile: llama70b        # which profile below to use (override with --profile)
+
+profiles:
+  llama70b:
+    endpoints:
+      together:
+        base_url: https://api.together.xyz/v1
+        model: meta-llama/Llama-3.3-70B-Instruct-Turbo   # FP8 "Turbo" path
+        api_key_env: TOGETHER_API_KEY
+        concurrency: 8
+      reference:
+        base_url: ${REF_BASE_URL}        # e.g. https://<you>--parity-ref-serve.modal.run/v1
+        model: meta-llama/Llama-3.3-70B-Instruct          # BF16 weights in vLLM
+        api_key_env: REF_API_KEY
+        concurrency: 32
+  llama8b:                # cheap mode: fits one 24 GB GPU locally
+    endpoints:
+      together:
+        base_url: https://api.together.xyz/v1
+        model: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+        api_key_env: TOGETHER_API_KEY
+        concurrency: 8
+      reference:
+        base_url: http://localhost:8000/v1
+        model: meta-llama/Llama-3.1-8B-Instruct
+        api_key_env: REF_API_KEY
+        concurrency: 32
+
+quality:
+  seed: 1234
+  temperature: 0.0
+  gsm8k_n: 1319            # full test split; lower for a smoke run
+  humaneval_n: 164         # full set
+  max_tokens_gsm8k: 512
+  max_tokens_humaneval: 768
+  repeats: 2               # 2 runs per endpoint -> run-to-run noise floor
+  equivalence_margin_pp: 2.0   # TOST margin, percentage points
+
+speed:
+  prompt_tokens: [128, 1024, 4096, 6000]
+  max_tokens: 256
+  reps: 12
+  warmup: 2
+
+bootstrap:
+  n_resamples: 10000
+  seed: 7

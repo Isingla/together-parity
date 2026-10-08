@@ -1,0 +1,32 @@
+profile: mock
+profiles:
+  mock:
+    endpoints:
+      together:
+        base_url: http://127.0.0.1:9002/v1
+        model: mock-turbo
+        concurrency: 16
+      reference:
+        base_url: http://127.0.0.1:9001/v1
+        model: mock-bf16
+        concurrency: 16
+quality:
+  seed: 1234
+  temperature: 0.0
+  gsm8k_n: 1319
+  humaneval_n: 164
+  max_tokens_gsm8k: 512
+  max_tokens_humaneval: 768
+  repeats: 2
+  equivalence_margin_pp: 2.0
+speed:
+  prompt_tokens:
+  - 128
+  - 1024
+  - 4096
+  max_tokens: 64
+  reps: 5
+  warmup: 1
+bootstrap:
+  n_resamples: 2000
+  seed: 7
