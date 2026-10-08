@@ -26,11 +26,13 @@ GPU = os.environ.get("PARITY_GPU", "H100:2")
 TP = int(GPU.split(":")[1]) if ":" in GPU else 1
 MAX_LEN = int(os.environ.get("PARITY_MAX_LEN", "8192"))  # 70B BF16 on 2x80GB leaves little KV room
 
+VLLM_VERSION = "0.31.0"
+
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    # Unpinned on purpose for the first run; the harness records the server's
-    # /version in results/<profile>/meta.json. Pin it here afterwards.
-    .pip_install("vllm", "huggingface_hub[hf_transfer]")
+    # Pinned: unpinned, pip backtracked to an ancient source-only vLLM release.
+    # The harness also records the server's /version in results/<profile>/meta.json.
+    .uv_pip_install(f"vllm=={VLLM_VERSION}", "huggingface_hub[hf_transfer]")
     # bake the choice into the container so the remote process sees the same values
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "PARITY_MODEL": MODEL, "PARITY_GPU": GPU,
           "PARITY_MAX_LEN": str(MAX_LEN)})
