@@ -136,8 +136,10 @@ def run_program(program: str, timeout: float = 10.0) -> tuple[bool, str]:
         with open(path, "w", encoding="utf-8") as f:
             f.write(program)
         try:
+            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
             r = subprocess.run([sys.executable, "-I", path], cwd=d, capture_output=True,
-                               text=True, timeout=timeout)
+                               text=True, encoding="utf-8", errors="replace",
+                               timeout=timeout, env=env)
         except subprocess.TimeoutExpired:
             return False, "timeout"
         return r.returncode == 0, (r.stderr or "")[-300:]
