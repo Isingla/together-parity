@@ -10,7 +10,17 @@ Together lists `meta-llama/Llama-3.3-70B-Instruct-Turbo` as an **FP8-quantized**
 so the reference here is Meta's released **BF16** weights. Same weights, different
 precision and kernels — exactly what "same quality" has to survive.
 
-> Results: see [`results/llama70b/RESULTS.md`](results/llama70b/RESULTS.md) and [`WRITEUP.md`](WRITEUP.md).
+## Result (Oct 8, 2026)
+
+**Quality: equivalent within ±2 points.** GSM8K 96.2% (BF16) vs 95.7% (Together FP8);
+HumanEval 86.6% vs 85.4%; pooled Δ −0.6 pp, 95% CI [−1.3, +0.1].
+**Speed: 0.8–1.6× decode tokens/sec vs stock vLLM on dedicated 2× H100**, with slower,
+more variable time-to-first-token. **Side finding:** Together's endpoint is not deterministic
+at temperature 0 (25% of HumanEval code outputs changed between identical runs, vs 3.7% for vLLM).
+
+Full tables: [`results/llama70b/RESULTS.md`](results/llama70b/RESULTS.md) · one-page writeup: [`WRITEUP.md`](WRITEUP.md)
+
+![speed](results/llama70b/speed.png)
 
 ## What it measures
 
@@ -21,6 +31,10 @@ precision and kernels — exactly what "same quality" has to survive.
 | **Equivalence** | "No significant difference" isn't proof of parity. Parity is claimed only if the 90% CI of Δ sits inside ±2 pp (TOST). Otherwise the verdict says *inconclusive*. |
 | **Answer flips vs noise** | vLLM isn't bit-deterministic across batches either, so each endpoint runs twice. The test is whether Together changes answers *more often than the reference disagrees with itself* (bootstrap CI on the excess flip rate). |
 | **Speed** | Time-to-first-token and decode tokens/sec at ~128 / 1k / 4k / 6k prompt tokens, 12 reps each after warmup, batch of one. Every request starts with a unique nonce so prefix caching can't hide prefill. Ratio-of-medians with bootstrap CIs. |
+
+Reference weights come from `unsloth/Llama-3.3-70B-Instruct`, an ungated mirror of Meta's
+BF16 release (set `PARITY_MODEL=meta-llama/Llama-3.3-70B-Instruct` plus an `HF_TOKEN` in the
+secret to use Meta's repo directly).
 
 Data files are vendored in `data/` and pinned by sha256; the run writes model IDs, server
 `/version`, and timestamps to `results/<profile>/meta.json`.
@@ -34,6 +48,7 @@ pip install -r requirements.txt
 python -m pytest -q tests          # 16 tests, no network or GPU
 
 # 1. Reference: Llama 3.3 70B BF16 on 2x H100 via Modal (see header of serve/modal_vllm.py)
+modal secret create parity-ref VLLM_API_KEY=<pick-a-password>
 modal serve serve/modal_vllm.py    # leave running; copy the URL it prints
 
 # 2. In a second terminal

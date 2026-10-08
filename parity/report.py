@@ -41,11 +41,13 @@ def quality_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], li
              f"| Task | n | {REF} acc | {TEST} acc | Δ (pp) | 95% CI (pp) | McNemar p | ref-only / test-only | Verdict |",
              "|---|---|---|---|---|---|---|---|---|"]
     flips = ["", "### Do answers change more than run-to-run noise?", "",
-             "Flip rate = share of prompts whose extracted answer differs. "
-             "*Noise floor* = reference run 1 vs reference run 2 (same server, same weights). "
-             "If the optimized path only changes answers as often as the reference "
-             "disagrees with itself, the change is indistinguishable from serving noise.", "",
-             f"| Task | {REF} vs {TEST} | {REF} vs {REF} (noise) | {TEST} vs {TEST} | Excess flips (pp) | 95% CI | Byte-identical outputs |",
+             "Flip rate = share of prompts whose answer differs (GSM8K: the extracted number; "
+             "HumanEval: the exact code text, so formatting-only changes count). "
+             "*Self-noise* = the same endpoint run twice on identical prompts at temperature 0. "
+             "The excess is measured against the **larger** of the two self-noise rates: if the "
+             "endpoints disagree with each other no more than one of them disagrees with itself, "
+             "the difference is indistinguishable from serving nondeterminism.", "",
+             f"| Task | {REF} vs {TEST} | {REF} self-noise | {TEST} self-noise | Excess over larger self-noise (pp) | 95% CI | Byte-identical outputs |",
              "|---|---|---|---|---|---|---|"]
     verdicts = []
     all_ref, all_test = [], []
@@ -66,16 +68,20 @@ def quality_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], li
                      f"{pa.ref_only} / {pa.test_only} | {pa.verdict().split(':')[0]} |")
         ids3 = [i for i in ids if i in d[(REF, 2)]]
         if ids3:
-            fr = flip_rate([d[(REF, 1)][i]["pred"] for i in ids3], [d[(REF, 2)][i]["pred"] for i in ids3],
-                           [d[(TEST, 1)][i]["pred"] for i in ids3],
+            P = lambda e, r, xs: [d[(e, r)][i]["pred"] for i in xs]
+            fr = flip_rate(P(REF, 1, ids3), P(REF, 2, ids3), P(TEST, 1, ids3),
                            n_resamples=b["n_resamples"], seed=b["seed"])
-            ids4 = [i for i in ids if i in d[(TEST, 2)]]
-            tt = (np.mean([d[(TEST, 1)][i]["pred"] != d[(TEST, 2)][i]["pred"] for i in ids4])
-                  if ids4 else float("nan"))
+            ids4 = [i for i in ids3 if i in d[(TEST, 2)]]
+            if ids4:   # same cross-disagreement, judged against the test endpoint's own noise
+                ft = flip_rate(P(TEST, 1, ids4), P(TEST, 2, ids4), P(REF, 1, ids4),
+                               n_resamples=b["n_resamples"], seed=b["seed"])
+                best = ft if ft.noise > fr.noise else fr
+                tt = _pct(ft.noise)
+            else:
+                best, tt = fr, "n/a"
             ident = np.mean([d[(REF, 1)][i]["text"] == d[(TEST, 1)][i]["text"] for i in ids])
-            flips.append(f"| {task} | {_pct(fr.cross)} | {_pct(fr.noise)} | "
-                         f"{_pct(tt) if ids4 else 'n/a'} | {_pp(fr.excess)} | "
-                         f"[{_pp(fr.ci95[0])}, {_pp(fr.ci95[1])}] | {_pct(ident)} |")
+            flips.append(f"| {task} | {_pct(fr.cross)} | {_pct(fr.noise)} | {tt} | "
+                         f"{_pp(best.excess)} | [{_pp(best.ci95[0])}, {_pp(best.ci95[1])}] | {_pct(ident)} |")
     if len(all_ref) > 1:
         pa = paired_accuracy(np.concatenate(all_ref), np.concatenate(all_test), margin=margin,
                              n_resamples=b["n_resamples"], seed=b["seed"])
