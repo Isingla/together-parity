@@ -12,11 +12,11 @@ from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 GSM = {}
-for line in open(DATA / "gsm8k_test.jsonl"):
+for line in open(DATA / "gsm8k_test.jsonl", encoding="utf-8"):
     ex = json.loads(line)
     GSM[ex["question"]] = ex["answer"].split("####")[-1].strip().replace(",", "")
 HE = {}
-with gzip.open(DATA / "HumanEval.jsonl.gz", "rt") as f:
+with gzip.open(DATA / "HumanEval.jsonl.gz", "rt", encoding="utf-8") as f:
     for line in f:
         ex = json.loads(line)
         HE[ex["prompt"]] = ex

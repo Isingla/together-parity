@@ -33,7 +33,7 @@ def test_humaneval_canonical_all_pass():
     import gzip, json
     from parity.tasks import DATA
     canon = {}
-    with gzip.open(DATA / "HumanEval.jsonl.gz", "rt") as f:
+    with gzip.open(DATA / "HumanEval.jsonl.gz", "rt", encoding="utf-8") as f:
         for l in f:
             ex = json.loads(l)
             canon[ex["task_id"]] = ex["prompt"] + ex["canonical_solution"]
@@ -48,7 +48,7 @@ def test_humaneval_wrong_and_body_only():
     assert not grade_humaneval(it, "```python\ndef has_close_elements(numbers, threshold):\n    return 'x'\n```")["correct"]
     import gzip, json
     from parity.tasks import DATA
-    with gzip.open(DATA / "HumanEval.jsonl.gz", "rt") as f:
+    with gzip.open(DATA / "HumanEval.jsonl.gz", "rt", encoding="utf-8") as f:
         body = json.loads(f.readline())["canonical_solution"]
     assert grade_humaneval(it, f"```python\n{body}```")["correct"]   # body-only reply
 
@@ -91,3 +91,10 @@ def test_flip_rate():
 def test_ratio_of_medians():
     r, (lo, hi) = ratio_of_medians(np.full(20, 2.0), np.full(20, 1.0), n_resamples=500)
     assert r == 2.0 and lo == hi == 2.0
+
+
+def test_zero_discordance_small_n_not_equivalent():
+    x = np.ones(40)
+    assert not paired_accuracy(x, x, margin=0.02, n_resamples=500).equivalent
+    y = np.ones(200)
+    assert paired_accuracy(y, y, margin=0.02, n_resamples=500).equivalent

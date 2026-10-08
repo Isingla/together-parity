@@ -57,6 +57,11 @@ def paired_accuracy(ref: np.ndarray, test: np.ndarray, *, margin: float,
     test_only = int(((ref == 0) & (test == 1)).sum())
     disc = ref_only + test_only
     p = binomtest(test_only, disc, 0.5).pvalue if disc else 1.0
+    if disc == 0:
+        # Bootstrap collapses to [0, 0] with no discordant prompts, which would
+        # "prove" equivalence at any n. Use the exact zero-event upper bound on the
+        # discordance rate instead (rule of three: 95% -> 3/n, 90% -> 2.3/n).
+        ci95, ci90 = (-3.0 / n, 3.0 / n), (-2.3 / n, 2.3 / n)
     return PairedAccuracy(
         n=n, acc_ref=ref.mean(), acc_test=test.mean(), delta=diff.mean(),
         ci95=ci95, ci90=ci90, ref_only=ref_only, test_only=test_only, mcnemar_p=p,

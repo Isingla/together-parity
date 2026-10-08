@@ -53,7 +53,7 @@ GSM8K_TEMPLATE = (
 
 def load_gsm8k(n: int, seed: int) -> list[Item]:
     items = []
-    with open(_verify("gsm8k_test.jsonl")) as f:
+    with open(_verify("gsm8k_test.jsonl"), encoding="utf-8") as f:
         for i, line in enumerate(f):
             ex = json.loads(line)
             gold = normalize_number(ex["answer"].split("####")[-1])
@@ -100,7 +100,7 @@ HE_TEMPLATE = (
 
 def load_humaneval(n: int, seed: int) -> list[Item]:
     items = []
-    with gzip.open(_verify("HumanEval.jsonl.gz"), "rt") as f:
+    with gzip.open(_verify("HumanEval.jsonl.gz"), "rt", encoding="utf-8") as f:
         for line in f:
             ex = json.loads(line)
             items.append(Item("humaneval", ex["task_id"],
@@ -133,7 +133,7 @@ def run_program(program: str, timeout: float = 10.0) -> tuple[bool, str]:
     container/VM if you care (see README)."""
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "prog.py")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(program)
         try:
             r = subprocess.run([sys.executable, "-I", path], cwd=d, capture_output=True,

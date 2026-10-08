@@ -32,7 +32,7 @@ RESULTS = ROOT / "results"
 
 
 def load_cfg(path: str, profile: str | None) -> tuple[dict, dict]:
-    cfg = yaml.safe_load(open(path))
+    cfg = yaml.safe_load(open(path, encoding="utf-8"))
     prof = profile or cfg["profile"]
     cfg["profile"] = prof
     return cfg, cfg["profiles"][prof]["endpoints"]
@@ -47,19 +47,19 @@ def endpoint(eps: dict, name: str) -> Endpoint:
 def read_jsonl(p: Path) -> list[dict]:
     if not p.exists():
         return []
-    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+    return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
 def write_meta(cfg: dict, ep: Endpoint, kind: str, info: dict):
     p = RESULTS / cfg["profile"] / "meta.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    meta = json.loads(p.read_text()) if p.exists() else {}
+    meta = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
     meta.setdefault("runs", []).append({
         "kind": kind, "endpoint": ep.name, "base_url": ep.base_url, "model": ep.model,
         "server_info": info, "utc": datetime.now(timezone.utc).isoformat(),
         "client_python": sys.version.split()[0], "client_platform": platform.platform(),
     })
-    p.write_text(json.dumps(meta, indent=2))
+    p.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 # ------------------------------------------------------------------ quality
@@ -102,7 +102,7 @@ async def _run_items(client: Client, items, task, q, out: Path):
         g = await asyncio.to_thread(grade, it, c.text) if not c.error else {"pred": None, "correct": False}
         row = {"id": it.id, **g, **c.to_dict()}
         async with lock:
-            with open(out, "a") as f:
+            with open(out, "a", encoding="utf-8") as f:
                 f.write(json.dumps(row) + "\n")
             n_done += 1
             if n_done % 50 == 0 or n_done == len(items):
@@ -117,7 +117,7 @@ def _filler(target_tokens: int, nonce: int) -> str:
     The body is identical across endpoints/reps (seeded by length) so both sides do
     the same work; a unique nonce on the FIRST line defeats prefix caching, so every
     request pays full prefill."""
-    src = (ROOT / "data" / "gsm8k_test.jsonl").read_text().splitlines()
+    src = (ROOT / "data" / "gsm8k_test.jsonl").read_text(encoding="utf-8").splitlines()
     rng = random.Random(target_tokens)
     rng.shuffle(src)
     text, chars = [], 0
@@ -149,7 +149,7 @@ async def cmd_speed(args, cfg, eps):
                 if rep < s["warmup"]:
                     continue
                 row = {"target_prompt_tokens": target, "rep": rep - s["warmup"], **c.to_dict()}
-                with open(out, "a") as f:
+                with open(out, "a", encoding="utf-8") as f:
                     f.write(json.dumps(row) + "\n")
                 tps = f"{c.decode_tok_s:.1f}" if c.decode_tok_s else "-"
                 ttft = f"{c.ttft_s:.3f}" if c.ttft_s else "-"
@@ -176,6 +176,10 @@ async def cmd_check(args, cfg, eps):
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # Windows consoles
+    except AttributeError:
+        pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     ap.add_argument("--profile", help="config profile (default from config.yaml)")

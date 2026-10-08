@@ -15,7 +15,7 @@ def _load(p: Path) -> dict[str, dict]:
     if not p.exists():
         return {}
     rows = {}
-    for line in p.read_text().splitlines():
+    for line in p.read_text(encoding="utf-8").splitlines():
         if line.strip():
             r = json.loads(line)
             if not r.get("error"):
@@ -90,10 +90,10 @@ def quality_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], li
 
 def speed_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], list[str]]:
     b = cfg["bootstrap"]
-    meta = json.loads((root / "meta.json").read_text()) if (root / "meta.json").exists() else {}
+    meta = json.loads((root / "meta.json").read_text(encoding="utf-8")) if (root / "meta.json").exists() else {}
     labels = {e: e for e in (REF, TEST)}
     labels.update({r["endpoint"]: f'{r["endpoint"]} ({r["model"].split("/")[-1]})' for r in meta.get("runs", [])})
-    rows = {e: [json.loads(l) for l in (root / "speed" / f"{e}.jsonl").read_text().splitlines()
+    rows = {e: [json.loads(l) for l in (root / "speed" / f"{e}.jsonl").read_text(encoding="utf-8").splitlines()
                 if l.strip()] if (root / "speed" / f"{e}.jsonl").exists() else []
             for e in (REF, TEST)}
     if not rows[REF] or not rows[TEST]:
@@ -168,7 +168,7 @@ def _plot(plot, path: Path, REF: str, TEST: str, labels: dict):
 
 
 def build_report(cfg, root: Path, REF: str = "reference", TEST: str = "together") -> str:
-    meta = json.loads((root / "meta.json").read_text()) if (root / "meta.json").exists() else {}
+    meta = json.loads((root / "meta.json").read_text(encoding="utf-8")) if (root / "meta.json").exists() else {}
     models = {r["endpoint"]: r["model"] for r in meta.get("runs", [])}
     q_lines, q_v = quality_section(cfg, root, REF, TEST)
     s_lines, s_v = speed_section(cfg, root, REF, TEST)
@@ -178,5 +178,5 @@ def build_report(cfg, root: Path, REF: str = "reference", TEST: str = "together"
           "## Verdict (auto-generated — read the tables before quoting it)", "",
           *(q_v + s_v), "", *q_lines, "", *s_lines, ""]
     out = root / ("RESULTS.md" if (REF, TEST) == ("reference", "together") else f"RESULTS_{REF}_vs_{TEST}.md")
-    out.write_text("\n".join(md))
+    out.write_text("\n".join(md), encoding="utf-8")
     return "\n".join(md)
