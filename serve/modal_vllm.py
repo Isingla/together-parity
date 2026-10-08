@@ -67,6 +67,9 @@ def serve():
         "--max-model-len", str(MAX_LEN),
         "--gpu-memory-utilization", "0.92",
         "--seed", "1234",
+        # Volume is a 9P mount; without prefetch vLLM reads shards lazily (~1 min/shard,
+        # ~30 min total). Prefetch loaded all 131 GiB in ~33 s.
+        "--safetensors-load-strategy", "prefetch",
         "--api-key", os.environ["VLLM_API_KEY"],
     ]
     print(" ".join(c if c != os.environ["VLLM_API_KEY"] else "***" for c in cmd))
