@@ -21,7 +21,7 @@ import subprocess
 
 import modal
 
-MODEL = os.environ.get("PARITY_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
+MODEL = os.environ.get("PARITY_MODEL", "unsloth/Llama-3.3-70B-Instruct")  # ungated mirror of Meta BF16
 GPU = os.environ.get("PARITY_GPU", "H100:2")
 TP = int(GPU.split(":")[1]) if ":" in GPU else 1
 MAX_LEN = int(os.environ.get("PARITY_MAX_LEN", "8192"))  # 70B BF16 on 2x80GB leaves little KV room
@@ -32,10 +32,15 @@ image = (
     modal.Image.debian_slim(python_version="3.12")
     # Pinned: unpinned, pip backtracked to an ancient source-only vLLM release.
     # The harness also records the server's /version in results/<profile>/meta.json.
-    .uv_pip_install(f"vllm=={VLLM_VERSION}", "huggingface_hub[hf_transfer]")
+    .uv_pip_install(f"vllm=={VLLM_VERSION}", "huggingface_hub")
     # bake the choice into the container so the remote process sees the same values
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "PARITY_MODEL": MODEL, "PARITY_GPU": GPU,
-          "PARITY_MAX_LEN": str(MAX_LEN)})
+    .env({"PARITY_MODEL": MODEL, "PARITY_GPU": GPU, "PARITY_MAX_LEN": str(MAX_LEN),
+          # The PyPI vLLM wheel ships without FlashInfer's prebuilt kernels, so these
+          # paths try to JIT-compile with nvcc (absent in debian_slim) and crash at
+          # startup. Turn them off: all-reduce falls back to vLLM's built-in custom
+          # all-reduce; greedy decoding never needs the FlashInfer sampler anyway.
+          "VLLM_ALLREDUCE_USE_FLASHINFER": "0",
+          "VLLM_USE_FLASHINFER_SAMPLER": "0"})
 )
 hf_cache = modal.Volume.from_name("parity-hf-cache", create_if_missing=True)
 vllm_cache = modal.Volume.from_name("parity-vllm-cache", create_if_missing=True)
@@ -65,4 +70,15 @@ def serve():
         "--api-key", os.environ["VLLM_API_KEY"],
     ]
     print(" ".join(c if c != os.environ["VLLM_API_KEY"] else "***" for c in cmd))
-    subprocess.Popen(cmd)
+    proc = subprocess.Popen(cmd)
+
+    # If vLLM dies (bad weights, OOM, ...), kill the container instead of letting
+    # it idle on 2 GPUs until the 40-min startup timeout.
+    import threading
+
+    def _watch():
+        code = proc.wait()
+        print(f"vLLM exited with code {code}; stopping container")
+        os._exit(1)
+
+    threading.Thread(target=_watch, daemon=True).start()

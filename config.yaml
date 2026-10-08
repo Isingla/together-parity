@@ -15,7 +15,7 @@ profiles:
         concurrency: 8
       reference:
         base_url: ${REF_BASE_URL}        # e.g. https://<you>--parity-ref-serve.modal.run/v1
-        model: meta-llama/Llama-3.3-70B-Instruct          # BF16 weights in vLLM
+        model: unsloth/Llama-3.3-70B-Instruct          # BF16 weights in vLLM
         api_key_env: REF_API_KEY
         concurrency: 32
   llama8b:                # cheap mode: fits one 24 GB GPU locally
