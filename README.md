@@ -21,6 +21,12 @@ measured against that self-noise, the FP8 path changes no more answers than serv
 
 Full tables: [`results/llama70b/RESULTS.md`](results/llama70b/RESULTS.md) · one-page writeup: [`WRITEUP.md`](WRITEUP.md)
 
+Every number is reproducible from the raw per-prompt outputs in `results/llama70b/quality/` and
+`results/llama70b/speed/` (one JSON line per request: full model text, extracted answer, correctness,
+TTFT, decode speed). `python run.py report` rebuilds the tables and chart from them with no API calls.
+The first Together pass ran with a mistyped API key, so `together/run1` and `run2` GSM8K files also
+contain HTTP 401 rows; they're marked with an `error` field, retried, and excluded from every statistic.
+
 ![speed](results/llama70b/speed.png)
 
 ## What it measures

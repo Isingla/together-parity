@@ -97,7 +97,8 @@ def quality_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], li
 def speed_section(cfg, root: Path, REF: str, TEST: str) -> tuple[list[str], list[str]]:
     b = cfg["bootstrap"]
     meta = json.loads((root / "meta.json").read_text(encoding="utf-8")) if (root / "meta.json").exists() else {}
-    labels = {e: e for e in (REF, TEST)}
+    eps = cfg["profiles"][cfg["profile"]]["endpoints"]
+    labels = {e: f'{e} ({eps[e]["model"].split("/")[-1]})' if e in eps else e for e in (REF, TEST)}
     labels.update({r["endpoint"]: f'{r["endpoint"]} ({r["model"].split("/")[-1]})' for r in meta.get("runs", [])})
     rows = {e: [json.loads(l) for l in (root / "speed" / f"{e}.jsonl").read_text(encoding="utf-8").splitlines()
                 if l.strip()] if (root / "speed" / f"{e}.jsonl").exists() else []
@@ -175,7 +176,11 @@ def _plot(plot, path: Path, REF: str, TEST: str, labels: dict):
 
 def build_report(cfg, root: Path, REF: str = "reference", TEST: str = "together") -> str:
     meta = json.loads((root / "meta.json").read_text(encoding="utf-8")) if (root / "meta.json").exists() else {}
-    models = {r["endpoint"]: r["model"] for r in meta.get("runs", [])}
+    # meta.json (written during runs) wins; fall back to config.yaml so a fresh clone with
+    # only the raw JSONL still reproduces the report exactly.
+    eps = cfg["profiles"][cfg["profile"]]["endpoints"]
+    models = {e: c["model"] for e, c in eps.items()}
+    models.update({r["endpoint"]: r["model"] for r in meta.get("runs", [])})
     q_lines, q_v = quality_section(cfg, root, REF, TEST)
     s_lines, s_v = speed_section(cfg, root, REF, TEST)
     md = ["# Results", "",
