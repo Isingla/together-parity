@@ -16,7 +16,8 @@ precision and kernels — exactly what "same quality" has to survive.
 HumanEval 86.6% vs 85.4%; pooled Δ −0.6 pp, 95% CI [−1.3, +0.1].
 **Speed: 0.8–1.6× decode tokens/sec vs stock vLLM on dedicated 2× H100**, with slower,
 more variable time-to-first-token. **Side finding:** Together's endpoint is not deterministic
-at temperature 0 (25% of HumanEval code outputs changed between identical runs, vs 3.7% for vLLM).
+at temperature 0 (25% of HumanEval code outputs changed between identical runs, vs 3.7% for vLLM);
+measured against that self-noise, the FP8 path changes no more answers than serving nondeterminism does.
 
 Full tables: [`results/llama70b/RESULTS.md`](results/llama70b/RESULTS.md) · one-page writeup: [`WRITEUP.md`](WRITEUP.md)
 
@@ -29,7 +30,7 @@ Full tables: [`results/llama70b/RESULTS.md`](results/llama70b/RESULTS.md) · one
 | **Accuracy** | GSM8K test (all 1,319) + HumanEval (all 164), greedy decoding, fixed seed, identical prompts on both endpoints. HumanEval graded by executing the hidden tests. |
 | **Paired difference** | Δ accuracy per prompt with a 10,000-resample paired bootstrap 95% CI, plus an exact McNemar test on the discordant prompts. |
 | **Equivalence** | "No significant difference" isn't proof of parity. Parity is claimed only if the 90% CI of Δ sits inside ±2 pp (TOST). Otherwise the verdict says *inconclusive*. |
-| **Answer flips vs noise** | vLLM isn't bit-deterministic across batches either, so each endpoint runs twice. The test is whether Together changes answers *more often than the reference disagrees with itself* (bootstrap CI on the excess flip rate). |
+| **Answer flips vs noise** | Neither endpoint is bit-deterministic, so each runs the full set twice. The test is whether the two endpoints disagree *more often than the noisier one disagrees with itself* (bootstrap CI on the excess flip rate). |
 | **Speed** | Time-to-first-token and decode tokens/sec at ~128 / 1k / 4k / 6k prompt tokens, 12 reps each after warmup, batch of one. Every request starts with a unique nonce so prefix caching can't hide prefill. Ratio-of-medians with bootstrap CIs. |
 
 Reference weights come from `unsloth/Llama-3.3-70B-Instruct`, an ungated mirror of Meta's
@@ -45,7 +46,7 @@ Needs Python 3.10+, a Together API key, and a GPU for the reference path.
 
 ```powershell
 pip install -r requirements.txt
-python -m pytest -q tests          # 16 tests, no network or GPU
+python -m pytest -q tests          # 17 tests, no network or GPU
 
 # 1. Reference: Llama 3.3 70B BF16 on 2x H100 via Modal (see header of serve/modal_vllm.py)
 modal secret create parity-ref VLLM_API_KEY=<pick-a-password>
@@ -64,7 +65,7 @@ python run.py speed   --endpoint together
 python run.py report                                   # -> results/llama70b/RESULTS.md + speed.png
 ```
 
-Bash users: `export VAR=...` instead of `$env:VAR = ...`. Everything is resumable —
+macOS/Linux: `export VAR=...` instead of `$env:VAR = ...`. Everything is resumable —
 re-running a command skips finished prompts.
 
 **Cheaper mode (8B):** `--profile llama8b` compares `Meta-Llama-3.1-8B-Instruct-Turbo` against
@@ -78,8 +79,12 @@ serving the same model to `config.yaml` (e.g. a cloud provider's Llama 3.3 70B),
 ### Cost
 
 - Together: ~1.5M tokens for everything — a few dollars at most, inside free credits.
-- Modal reference: 2x H100 for ~1–1.5 h including the first ~140 GB weight download,
+- Modal reference: 2x H100 for ~1–1.5 h including the first ~131 GB weight download,
   roughly $8–12 at Modal's H100 rate. Stop the app when the runs finish.
+- Gotchas fixed in `serve/modal_vllm.py`: vLLM is pinned (unpinned pip backtracks to a
+  source-only 2024 release), FlashInfer all-reduce is disabled (it JIT-compiles with `nvcc`,
+  which the slim image lacks), and weights are prefetched from the Volume (lazy reads took
+  ~1 min per shard; prefetch loads all 30 in ~33 s).
 
 ## Honest limits
 
